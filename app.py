@@ -123,7 +123,7 @@ def main():
     )
 
     st.markdown('<div class="big-title">📊 AI Assistant for PDFs and Spreadsheets</div>', unsafe_allow_html=True)
-    st.write("Chat with your data using LLaMA 3.1 (Groq API powered)")
+    st.write("Chat with your data using Meta - LLaMA 3.1 (Model Inference Groq API)")
 
     with st.sidebar:
         st.header("📁 File Type & Upload")
