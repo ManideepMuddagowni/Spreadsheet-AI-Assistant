@@ -1,0 +1,14 @@
+streamlit
+pypdf
+langchain
+torch
+accelerate
+bitsandbytes
+transformers
+sentence_transformers
+faiss_cpu
+langchain-community
+ctransformers
+phidata
+groq
+PyPDF2
