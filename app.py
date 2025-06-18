@@ -60,7 +60,8 @@ def create_prompt(chunks, conversation, question, max_context_tokens=3000):
         history_text += f"{role.capitalize()}: {content}\n"
 
     prompt = f"""
-You are a helpful assistant. Use the following context to answer the question below. If the answer is not in the context, say "Answer is not available in the context."
+    You are a helpful assistant. 
+    Use the following context to answer the question below. If the answer is not in the context, say "Answer is not available in the context."
 
 Context:
 {context}
@@ -142,50 +143,79 @@ def main():
     if "conversation" not in st.session_state:
         st.session_state["conversation"] = []
 
-    if uploaded_files and process_files:
-        with st.spinner("🔍 Extracting and chunking text..."):
-            combined_text = ""
-            if file_type == "PDF":
-                combined_text = get_pdf_text(uploaded_files)
-            elif file_type == "CSV":
-                combined_text = get_csv_text(uploaded_files)
+    if "summary" not in st.session_state:
+        st.session_state["summary"] = ""
 
-            if combined_text.strip():
-                chunks = chunk_text(combined_text)
-                st.session_state["chunks"] = chunks
-                st.session_state["conversation"] = []
-                st.success(f"✅ Processed {file_type} into {len(chunks)} chunks.")
+    # ----------------- MAIN COLUMNS -----------------
+    left_col, right_col = st.columns([2, 1])  # Chat on left, Summary on right
 
-    st.markdown("---")
-    st.subheader("💬 Ask Questions")
+    with left_col:
+        if uploaded_files and process_files:
+            with st.spinner("🔍 Extracting and chunking text..."):
+                combined_text = ""
+                if file_type == "PDF":
+                    combined_text = get_pdf_text(uploaded_files)
+                elif file_type == "CSV":
+                    combined_text = get_csv_text(uploaded_files)
 
-    chat_container = st.container()
-    for msg in st.session_state["conversation"]:
-        with chat_container:
-            if msg["role"] == "user":
-                st.markdown(f'<div class="chat-bubble-user">👤 <strong>You:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="chat-bubble-assistant">🤖 <strong>Assistant:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
+                if combined_text.strip():
+                    chunks = chunk_text(combined_text)
+                    st.session_state["chunks"] = chunks
+                    st.session_state["conversation"] = []
 
-    if "input_text" not in st.session_state:
-        st.session_state["input_text"] = ""
+                    # Create summary
+                    summary_prompt = f"""
+                    You are a summarizer. Read the following content and produce a clear, structured summary.
+                    If it’s a CSV, summarize the kind of data it contains, the number of rows and columns, and sample headers.
+                    If it’s a PDF, break it into sections (e.g., Introduction, Methods, Results, Conclusion) if applicable.
 
-    def submit():
-        user_input = st.session_state.input_text
-        if user_input:
-            st.session_state.conversation.append({"role": "user", "content": user_input})
+                    Content:
+                    {combined_text[:3000]}  # Limit to 3000 chars to avoid long prompts
 
-            if st.session_state["chunks"]:
-                with st.spinner("🧠 Thinking..."):
-                    prompt = create_prompt(st.session_state["chunks"], st.session_state["conversation"], user_input)
-                    answer = query_groq(prompt)
-            else:
-                answer = "⚠️ Please upload and process a file first."
+                    Summary:
+                    """
+                    summary = query_groq(summary_prompt)
+                    st.session_state["summary"] = summary
 
-            st.session_state.conversation.append({"role": "assistant", "content": answer})
-            st.session_state.input_text = ""
+                    st.success(f"✅ Processed {file_type} into {len(chunks)} chunks.")
 
-    st.text_input("Type your question here...", key="input_text", on_change=submit, placeholder="Ask me anything from the uploaded file")
+        st.markdown("---")
+        st.subheader("💬 Ask Questions")
+
+        chat_container = st.container()
+        for msg in st.session_state["conversation"]:
+            with chat_container:
+                if msg["role"] == "user":
+                    st.markdown(f'<div class="chat-bubble-user">👤 <strong>You:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="chat-bubble-assistant">🤖 <strong>Assistant:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
+
+        if "input_text" not in st.session_state:
+            st.session_state["input_text"] = ""
+
+        def submit():
+            user_input = st.session_state.input_text
+            if user_input:
+                st.session_state.conversation.append({"role": "user", "content": user_input})
+
+                if st.session_state["chunks"]:
+                    with st.spinner("🧠 Thinking..."):
+                        prompt = create_prompt(st.session_state["chunks"], st.session_state["conversation"], user_input)
+                        answer = query_groq(prompt)
+                else:
+                    answer = "⚠️ Please upload and process a file first."
+
+                st.session_state.conversation.append({"role": "assistant", "content": answer})
+                st.session_state.input_text = ""
+
+        st.text_input("Type your question here...", key="input_text", on_change=submit, placeholder="Ask me anything from the uploaded file")
+
+    with right_col:
+        st.subheader("📝 Summary of Uploaded Data")
+        if st.session_state["summary"]:
+            st.markdown(st.session_state["summary"])
+        else:
+            st.info("Upload and process a file to generate a summary here.")
 
 if __name__ == "__main__":
     main()
